@@ -1,100 +1,64 @@
-export const TOOLS = [
-  {
-    name: "tabs_list",
+import { z } from "zod";
+
+export const TOOLS = {
+  tabs_list: {
     description: "List all open browser tabs",
-    inputSchema: { type: "object", properties: {} },
+    schema: {},
   },
-  {
-    name: "tab_create",
+  tab_create: {
     description: "Create a new tab",
-    inputSchema: {
-      type: "object",
-      properties: {
-        url: { type: "string", description: "URL to open" },
-      },
+    schema: {
+      url: z.string().optional().describe("URL to open"),
     },
   },
-  {
-    name: "tab_navigate",
+  tab_navigate: {
     description: "Navigate a tab to a URL",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tabId: { type: "number", description: "Tab ID" },
-        url: { type: "string", description: "URL to navigate to" },
-      },
-      required: ["tabId", "url"],
+    schema: {
+      tabId: z.number().describe("Tab ID"),
+      url: z.string().describe("URL to navigate to"),
     },
   },
-  {
-    name: "tab_close",
+  tab_close: {
     description: "Close a tab",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tabId: { type: "number", description: "Tab ID" },
-      },
-      required: ["tabId"],
+    schema: {
+      tabId: z.number().describe("Tab ID"),
     },
   },
-  {
-    name: "tab_switch",
+  tab_switch: {
     description: "Switch to (activate) a tab",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tabId: { type: "number", description: "Tab ID" },
-      },
-      required: ["tabId"],
+    schema: {
+      tabId: z.number().describe("Tab ID"),
     },
   },
-  {
-    name: "page_read",
+  page_read: {
     description: "Read page content as a simplified DOM tree with text, roles, and attributes",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tabId: { type: "number", description: "Tab ID" },
-      },
-      required: ["tabId"],
+    schema: {
+      tabId: z.number().describe("Tab ID"),
     },
   },
-  {
-    name: "page_click",
+  page_click: {
     description: "Click an element by CSS selector or coordinates",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tabId: { type: "number", description: "Tab ID" },
-        selector: { type: "string", description: "CSS selector" },
-        x: { type: "number", description: "X coordinate" },
-        y: { type: "number", description: "Y coordinate" },
-      },
-      required: ["tabId"],
+    schema: {
+      tabId: z.number().describe("Tab ID"),
+      selector: z.string().optional().describe("CSS selector"),
+      x: z.number().optional().describe("X coordinate"),
+      y: z.number().optional().describe("Y coordinate"),
     },
   },
-  {
-    name: "page_type",
+  page_type: {
     description: "Type text into an element",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tabId: { type: "number", description: "Tab ID" },
-        text: { type: "string", description: "Text to type" },
-        selector: { type: "string", description: "CSS selector (optional, defaults to active element)" },
-      },
-      required: ["tabId", "text"],
+    schema: {
+      tabId: z.number().describe("Tab ID"),
+      text: z.string().describe("Text to type"),
+      selector: z.string().optional().describe("CSS selector (defaults to active element)"),
     },
   },
-  {
-    name: "page_screenshot",
+  page_screenshot: {
     description: "Capture a screenshot of the visible tab area",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tabId: { type: "number", description: "Tab ID" },
-      },
-      required: ["tabId"],
+    schema: {
+      tabId: z.number().describe("Tab ID"),
     },
   },
-];
+};
+
+export const TOOL_NAMES = Object.keys(TOOLS);

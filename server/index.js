@@ -12,10 +12,10 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
-for (const tool of TOOLS) {
-  server.tool(tool.name, tool.description, tool.inputSchema, async (params) => {
+for (const [name, tool] of Object.entries(TOOLS)) {
+  server.tool(name, tool.description, tool.schema, async (params) => {
     try {
-      const result = await bridge.send(tool.name, params);
+      const result = await bridge.send(name, params);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     } catch (err) {
       return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };

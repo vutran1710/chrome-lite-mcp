@@ -1,49 +1,40 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { TOOLS } from "../tools.js";
+import { TOOLS, TOOL_NAMES } from "../tools.js";
 
 describe("TOOLS", () => {
-  const EXPECTED_TOOLS = [
+  const EXPECTED = [
     "tabs_list", "tab_create", "tab_navigate", "tab_close",
     "tab_switch", "page_read", "page_click", "page_type", "page_screenshot",
   ];
 
   it("defines all expected tools", () => {
-    const names = TOOLS.map((t) => t.name);
-    assert.deepEqual(names, EXPECTED_TOOLS);
+    assert.deepEqual(TOOL_NAMES, EXPECTED);
   });
 
-  it("every tool has name, description, and inputSchema", () => {
-    for (const tool of TOOLS) {
-      assert.ok(tool.name, `missing name`);
-      assert.ok(tool.description, `${tool.name}: missing description`);
-      assert.ok(tool.inputSchema, `${tool.name}: missing inputSchema`);
-      assert.equal(tool.inputSchema.type, "object", `${tool.name}: schema type must be object`);
+  it("every tool has description and schema", () => {
+    for (const [name, tool] of Object.entries(TOOLS)) {
+      assert.ok(tool.description, `${name}: missing description`);
+      assert.ok(typeof tool.schema === "object", `${name}: missing schema`);
     }
   });
 
-  it("tools with required params declare them", () => {
-    const requireTabId = ["tab_navigate", "tab_close", "tab_switch", "page_read", "page_click", "page_type", "page_screenshot"];
-    for (const name of requireTabId) {
-      const tool = TOOLS.find((t) => t.name === name);
-      assert.ok(tool.inputSchema.required?.includes("tabId"), `${name}: should require tabId`);
+  it("tools requiring tabId have it in schema", () => {
+    const needsTabId = ["tab_navigate", "tab_close", "tab_switch", "page_read", "page_click", "page_type", "page_screenshot"];
+    for (const name of needsTabId) {
+      assert.ok(TOOLS[name].schema.tabId, `${name}: should have tabId in schema`);
     }
   });
 
-  it("tab_navigate requires url", () => {
-    const tool = TOOLS.find((t) => t.name === "tab_navigate");
-    assert.ok(tool.inputSchema.required.includes("url"));
+  it("tab_navigate has url in schema", () => {
+    assert.ok(TOOLS.tab_navigate.schema.url);
   });
 
-  it("page_type requires text", () => {
-    const tool = TOOLS.find((t) => t.name === "page_type");
-    assert.ok(tool.inputSchema.required.includes("text"));
+  it("page_type has text in schema", () => {
+    assert.ok(TOOLS.page_type.schema.text);
   });
 
-  it("tabs_list and tab_create have no required params", () => {
-    for (const name of ["tabs_list", "tab_create"]) {
-      const tool = TOOLS.find((t) => t.name === name);
-      assert.ok(!tool.inputSchema.required, `${name}: should have no required params`);
-    }
+  it("tabs_list has empty schema", () => {
+    assert.deepEqual(TOOLS.tabs_list.schema, {});
   });
 });
