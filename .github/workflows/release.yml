@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: cd server && npm ci
+
+      - name: Build release tarball
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist/chrome-mcp/server
+          mkdir -p dist/chrome-mcp/extension
+          mkdir -p dist/chrome-mcp/docs
+
+          cp -r server/index.js server/bridge.js server/tools.js server/package.json server/node_modules dist/chrome-mcp/server/
+          cp -r extension/* dist/chrome-mcp/extension/
+          cp -r docs/* dist/chrome-mcp/docs/
+
+          cd dist
+          tar -czf "chrome-mcp-${TAG_NAME}.tar.gz" -C chrome-mcp .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/chrome-mcp-*.tar.gz
+          generate_release_notes: true

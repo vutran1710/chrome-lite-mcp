@@ -73,6 +73,8 @@ Heavy SPAs require specific handling:
 
 ```
 chrome-mcp/
+├── .github/workflows/
+│   └── release.yml        # GitHub Actions: build tarball on tag push
 ├── docs/
 │   ├── design.md          # This file — architecture and API
 │   └── skills.md          # App-specific automation patterns
@@ -88,6 +90,19 @@ chrome-mcp/
 ├── mcp-config.json        # Example config for claude --mcp-config
 └── README.md
 ```
+
+## Releases
+
+Tagged releases (`git tag v0.2.0 && git push origin v0.2.0`) trigger GitHub Actions to build a tarball:
+
+```
+chrome-mcp-v0.2.0.tar.gz
+├── server/          # index.js, bridge.js, tools.js, package.json, node_modules/
+├── extension/       # manifest.json, background.js, content.js
+└── docs/            # design.md, skills.md
+```
+
+Server deployments (e.g., ClaudeBox) download and extract the tarball to `/opt/chrome-mcp/` — no `git clone` or `npm install` needed.
 
 ## Usage
 
