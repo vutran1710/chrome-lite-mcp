@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Chrome MCP",
+  "name": "Chrome Lite MCP",
   "version": "0.1.0",
   "description": "Local MCP bridge for browser automation",
   "permissions": [

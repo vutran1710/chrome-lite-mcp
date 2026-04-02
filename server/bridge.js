@@ -69,7 +69,7 @@ export class ChromeBridge {
   }
 
   _log(msg) {
-    process.stderr.write(`[chrome-mcp] ${msg}\n`);
+    process.stderr.write(`[chrome-lite-mcp] ${msg}\n`);
   }
 
   _handleResponse(data) {

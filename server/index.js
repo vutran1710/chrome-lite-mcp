@@ -8,7 +8,7 @@ const PORT = parseInt(process.env.CHROME_MCP_PORT || "7331");
 const bridge = new ChromeBridge(PORT);
 
 const server = new McpServer({
-  name: "chrome-mcp",
+  name: "chrome-lite-mcp",
   version: "0.1.0",
 });
 

@@ -1,4 +1,4 @@
-# chrome-mcp
+# chrome-lite-mcp
 
 Local Chrome browser automation via MCP (Model Context Protocol). No remote bridges, no account matching — purely localhost.
 
@@ -25,11 +25,11 @@ The Chrome extension connects to a local WebSocket server. The MCP client talks 
 Download the latest release tarball:
 
 ```bash
-REPO="vutran1710/chrome-mcp"
+REPO="vutran1710/chrome-lite-mcp"
 DOWNLOAD_URL=$(curl -sfL "https://api.github.com/repos/${REPO}/releases/latest" \
-  | grep -o 'https://[^"]*chrome-mcp-.*\.tar\.gz[^"]*' | head -1)
-mkdir -p /opt/chrome-mcp
-curl -sfL "$DOWNLOAD_URL" | tar -xz -C /opt/chrome-mcp
+  | grep -o 'https://[^"]*chrome-lite-mcp-.*\.tar\.gz[^"]*' | head -1)
+mkdir -p /opt/chrome-lite-mcp
+curl -sfL "$DOWNLOAD_URL" | tar -xz -C /opt/chrome-lite-mcp
 ```
 
 The tarball includes `server/` (with node_modules), `extension/`, and `docs/`.
@@ -38,10 +38,10 @@ Launch Chrome with the extension and start the MCP server:
 
 ```bash
 # Start MCP server (WebSocket on port 7331)
-node /opt/chrome-mcp/server/index.js &
+node /opt/chrome-lite-mcp/server/index.js &
 
 # Launch Chrome with extension auto-loaded
-chromium --load-extension=/opt/chrome-mcp/extension &
+chromium --load-extension=/opt/chrome-lite-mcp/extension &
 ```
 
 ### MCP config
@@ -51,7 +51,7 @@ chromium --load-extension=/opt/chrome-mcp/extension &
   "mcpServers": {
     "chrome": {
       "command": "node",
-      "args": ["/path/to/chrome-mcp/server/index.js"]
+      "args": ["/path/to/chrome-lite-mcp/server/index.js"]
     }
   }
 }
@@ -66,7 +66,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-The workflow builds a tarball (`chrome-mcp-v0.2.0.tar.gz`) containing:
+The workflow builds a tarball (`chrome-lite-mcp-v0.2.0.tar.gz`) containing:
 - `server/` — MCP server with bundled node_modules
 - `extension/` — Chrome Manifest V3 extension
 - `docs/` — Design docs and app-specific skills reference

@@ -1,10 +1,10 @@
 {
-  "name": "chrome-mcp-server",
+  "name": "chrome-lite-mcp-server",
   "version": "0.1.0",
   "type": "module",
   "main": "index.js",
   "bin": {
-    "chrome-mcp": "index.js"
+    "chrome-lite-mcp": "index.js"
   },
   "scripts": {
     "start": "node index.js",

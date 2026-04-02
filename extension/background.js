@@ -11,7 +11,7 @@ function connect() {
   ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
-    console.log("[chrome-mcp] connected to server");
+    console.log("[chrome-lite-mcp] connected to server");
     if (reconnectTimer) {
       clearInterval(reconnectTimer);
       reconnectTimer = null;
@@ -35,7 +35,7 @@ function connect() {
   };
 
   ws.onclose = () => {
-    console.log("[chrome-mcp] disconnected, reconnecting...");
+    console.log("[chrome-lite-mcp] disconnected, reconnecting...");
     ws = null;
     if (!reconnectTimer) {
       reconnectTimer = setInterval(connect, 3000);

@@ -1,4 +1,4 @@
-# chrome-mcp
+# chrome-lite-mcp
 
 Chrome extension + local MCP server for browser automation. No remote bridges, no account matching — purely localhost.
 
@@ -72,7 +72,7 @@ Heavy SPAs require specific handling:
 ## File Structure
 
 ```
-chrome-mcp/
+chrome-lite-mcp/
 ├── .github/workflows/
 │   └── release.yml        # GitHub Actions: build tarball on tag push
 ├── docs/
@@ -96,13 +96,13 @@ chrome-mcp/
 Tagged releases (`git tag v0.2.0 && git push origin v0.2.0`) trigger GitHub Actions to build a tarball:
 
 ```
-chrome-mcp-v0.2.0.tar.gz
+chrome-lite-mcp-v0.2.0.tar.gz
 ├── server/          # index.js, bridge.js, tools.js, package.json, node_modules/
 ├── extension/       # manifest.json, background.js, content.js
 └── docs/            # design.md, skills.md
 ```
 
-Server deployments download and extract the tarball to `/opt/chrome-mcp/` — no `git clone` or `npm install` needed.
+Server deployments download and extract the tarball to `/opt/chrome-lite-mcp/` — no `git clone` or `npm install` needed.
 
 ## Usage
 
@@ -120,7 +120,7 @@ Server deployments download and extract the tarball to `/opt/chrome-mcp/` — no
   "mcpServers": {
     "chrome": {
       "command": "node",
-      "args": ["/path/to/chrome-mcp/server/index.js"]
+      "args": ["/path/to/chrome-lite-mcp/server/index.js"]
     }
   }
 }
