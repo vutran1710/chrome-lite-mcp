@@ -1,14 +1,16 @@
 # chrome-mcp
 
-Local Chrome browser automation for Claude Code via MCP. No remote bridges, no account matching — purely localhost.
+Local Chrome browser automation via MCP (Model Context Protocol). No remote bridges, no account matching — purely localhost.
+
+Works with any MCP-compatible client.
 
 ## How It Works
 
 ```
-Claude Code <-stdio-> MCP Server <-WebSocket-> Chrome Extension <-Chrome API-> Web Pages
+MCP Client <-stdio-> MCP Server <-WebSocket-> Chrome Extension <-Chrome API-> Web Pages
 ```
 
-The Chrome extension connects to a local WebSocket server. Claude Code talks to the MCP server via stdio. Everything stays on localhost.
+The Chrome extension connects to a local WebSocket server. The MCP client talks to the MCP server via stdio. Everything stays on localhost.
 
 ## Setup
 
@@ -16,11 +18,9 @@ The Chrome extension connects to a local WebSocket server. Claude Code talks to 
 
 1. Open Chrome -> `chrome://extensions` -> Enable Developer Mode -> Load unpacked -> select `extension/`
 2. `cd server && npm install`
-3. `claude --mcp-config mcp-config.json -p "list all open tabs"`
+3. Connect your MCP client to `server/index.js` via stdio
 
-Or add to your Claude Code MCP settings permanently.
-
-### Server deployment (e.g., ClaudeBox)
+### Server deployment
 
 Download the latest release tarball:
 
@@ -41,7 +41,20 @@ Launch Chrome with the extension and start the MCP server:
 node /opt/chrome-mcp/server/index.js &
 
 # Launch Chrome with extension auto-loaded
-DISPLAY=:99 chromium --no-sandbox --load-extension=/opt/chrome-mcp/extension &
+chromium --load-extension=/opt/chrome-mcp/extension &
+```
+
+### MCP config
+
+```json
+{
+  "mcpServers": {
+    "chrome": {
+      "command": "node",
+      "args": ["/path/to/chrome-mcp/server/index.js"]
+    }
+  }
+}
 ```
 
 ## Releases
@@ -76,7 +89,7 @@ The workflow builds a tarball (`chrome-mcp-v0.2.0.tar.gz`) containing:
 ## Docs
 
 - `docs/design.md` — Architecture, API reference, WebSocket protocol
-- `docs/skills.md` — App-specific automation patterns (Gmail, Discord, Zalo, Messenger, Slack) and am-server integration
+- `docs/skills.md` — App-specific automation patterns (Gmail, Discord, Zalo, Messenger, Slack)
 
 ## Testing
 

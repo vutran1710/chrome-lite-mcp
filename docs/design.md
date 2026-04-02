@@ -5,7 +5,7 @@ Chrome extension + local MCP server for browser automation. No remote bridges, n
 ## Architecture
 
 ```
-Claude Code CLI
+MCP Client
     ↕ stdio (MCP protocol)
 MCP Server + WebSocket Server (Node.js, localhost:7331)
     ↕ WebSocket
@@ -14,7 +14,7 @@ Chrome Extension (connects as WS client to localhost:7331)
 Web pages
 ```
 
-The Node.js process runs both the MCP server (stdio) and a WebSocket server. The Chrome extension connects to the WS server as a client on load. Commands flow: Claude -> MCP stdio -> Node.js -> WS -> extension -> Chrome API -> result back.
+The Node.js process runs both the MCP server (stdio) and a WebSocket server. The Chrome extension connects to the WS server as a client on load. Commands flow: MCP client -> stdio -> Node.js -> WS -> extension -> Chrome API -> result back.
 
 ## API
 
@@ -87,7 +87,7 @@ chrome-mcp/
 │   ├── bridge.js          # WebSocket bridge to Chrome extension
 │   ├── tools.js           # Tool definitions with Zod schemas
 │   └── package.json
-├── mcp-config.json        # Example config for claude --mcp-config
+├── mcp-config.json        # Example MCP client config
 └── README.md
 ```
 
@@ -102,15 +102,15 @@ chrome-mcp-v0.2.0.tar.gz
 └── docs/            # design.md, skills.md
 ```
 
-Server deployments (e.g., ClaudeBox) download and extract the tarball to `/opt/chrome-mcp/` — no `git clone` or `npm install` needed.
+Server deployments download and extract the tarball to `/opt/chrome-mcp/` — no `git clone` or `npm install` needed.
 
 ## Usage
 
 ```bash
 # 1. Install extension in Chrome (load unpacked -> extension/)
-# 2. Add to Claude Code MCP config (see mcp-config.json)
-# 3. Use with Claude Code
-claude -p "go to discord and check messages"
+# 2. Add to your MCP client config (see mcp-config.json)
+# 3. Connect your MCP client
+# Use with any MCP client
 ```
 
 ## MCP Config
