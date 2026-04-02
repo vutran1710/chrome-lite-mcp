@@ -68,6 +68,8 @@ async function handleCommand(method, params) {
       return pageType(params);
     case "page_screenshot":
       return pageScreenshot(params);
+    case "page_eval":
+      return pageEval(params);
     default:
       throw new Error(`Unknown method: ${method}`);
   }
@@ -88,7 +90,6 @@ async function tabsList() {
 
 async function tabCreate({ url }) {
   const tab = await chrome.tabs.create({ url: url || "about:blank" });
-  // Wait for load
   await waitForTabLoad(tab.id);
   const updated = await chrome.tabs.get(tab.id);
   return { id: updated.id, title: updated.title, url: updated.url };
@@ -117,52 +118,116 @@ async function tabSwitch({ tabId }) {
 
 // --- Page operations ---
 
-async function pageRead({ tabId }) {
+async function pageRead({ tabId, selector, mode }) {
   if (!tabId) throw new Error("tabId required");
+  const readMode = mode || "text";
+
+  // Try accessibility tree first (best for SPAs)
+  if (readMode === "accessibility") {
+    return readAccessibilityTree(tabId);
+  }
+
   const results = await chrome.scripting.executeScript({
     target: { tabId },
-    func: () => {
-      // Build a simplified accessibility tree
-      function buildTree(el, depth = 0) {
-        if (depth > 10) return null;
-        const node = {
-          tag: el.tagName?.toLowerCase() || "#text",
-          role: el.getAttribute?.("role") || "",
-          text: "",
-          attrs: {},
-          children: [],
-        };
+    args: [selector || null, readMode],
+    func: (rootSelector, m) => {
+      const SKIP_TAGS = new Set([
+        "script", "style", "noscript", "svg", "path", "meta", "link",
+        "br", "hr", "img", "video", "audio", "canvas", "iframe",
+      ]);
+      const INTERACTIVE_TAGS = new Set([
+        "a", "button", "input", "textarea", "select", "details", "summary",
+      ]);
+      const SEMANTIC_ROLES = new Set([
+        "button", "link", "textbox", "checkbox", "radio", "tab", "tabpanel",
+        "menu", "menuitem", "dialog", "alert", "navigation", "main",
+        "heading", "listitem", "option", "row", "cell", "columnheader",
+      ]);
 
-        // Collect relevant attributes
-        for (const attr of ["href", "src", "alt", "placeholder", "type", "name", "value", "aria-label"]) {
-          const val = el.getAttribute?.(attr);
-          if (val) node.attrs[attr] = val;
-        }
-
-        // Get direct text content (not children's text)
+      function getTextContent(el) {
+        let text = "";
         for (const child of el.childNodes || []) {
           if (child.nodeType === 3) {
-            const text = child.textContent?.trim();
-            if (text) node.text += text + " ";
+            const t = child.textContent?.trim();
+            if (t) text += t + " ";
           }
         }
-        node.text = node.text.trim();
+        return text.trim();
+      }
 
-        // Recurse children
+      function isVisible(el) {
+        if (!el.offsetParent && el.tagName !== "BODY" && el.tagName !== "HTML") {
+          const style = getComputedStyle(el);
+          if (style.display === "none" || style.visibility === "hidden") return false;
+        }
+        return true;
+      }
+
+      function buildTree(el, depth) {
+        if (depth > 30) return null;
+        const tag = el.tagName?.toLowerCase() || "";
+        if (SKIP_TAGS.has(tag)) return null;
+        if (!isVisible(el)) return null;
+
+        const role = el.getAttribute?.("role") || "";
+        const ariaLabel = el.getAttribute?.("aria-label") || "";
+        const directText = getTextContent(el);
+
+        // Build children first
+        const children = [];
         for (const child of el.children || []) {
           const childNode = buildTree(child, depth + 1);
-          if (childNode) node.children.push(childNode);
+          if (childNode) children.push(childNode);
         }
 
-        // Skip empty containers
-        if (!node.text && !node.role && node.children.length === 0 && Object.keys(node.attrs).length === 0) {
+        // In text mode, skip non-semantic wrappers
+        if (m === "text") {
+          // Flatten: if node is just a wrapper with no own text/role, hoist children
+          if (!directText && !role && !ariaLabel && !INTERACTIVE_TAGS.has(tag) && children.length > 0) {
+            if (children.length === 1) return children[0];
+            // Multiple children — keep as container but strip tag
+            return { children };
+          }
+          // Skip empty leaves
+          if (!directText && children.length === 0 && !ariaLabel) return null;
+        }
+
+        if (m === "interactive") {
+          const isInteractive = INTERACTIVE_TAGS.has(tag) || SEMANTIC_ROLES.has(role);
+          if (!isInteractive && children.length === 0) return null;
+          if (!isInteractive && children.length > 0) {
+            if (children.length === 1) return children[0];
+            return { children };
+          }
+        }
+
+        const node = {};
+        if (tag && tag !== "div" && tag !== "span") node.tag = tag;
+        if (role) node.role = role;
+        if (directText) node.text = directText;
+        if (ariaLabel) node.label = ariaLabel;
+
+        // Collect relevant attributes
+        const attrs = {};
+        for (const attr of ["href", "placeholder", "type", "name", "value"]) {
+          const val = el.getAttribute?.(attr);
+          if (val) attrs[attr] = val;
+        }
+        if (Object.keys(attrs).length > 0) node.attrs = attrs;
+        if (children.length > 0) node.children = children;
+
+        // Skip if truly empty
+        if (!node.tag && !node.role && !node.text && !node.label && !node.attrs && (!node.children || node.children.length === 0)) {
           return null;
         }
 
         return node;
       }
 
-      const tree = buildTree(document.body);
+      const root = rootSelector ? document.querySelector(rootSelector) : document.body;
+      if (!root) return { error: `Selector not found: ${rootSelector}` };
+
+      const tree = buildTree(root, 0);
       return {
         title: document.title,
         url: window.location.href,
@@ -172,6 +237,48 @@ async function pageRead({ tabId }) {
   });
 
   return results[0]?.result || { error: "no result" };
+}
+
+// Read the Chrome accessibility tree via debugger protocol
+async function readAccessibilityTree(tabId) {
+  const target = { tabId };
+  try {
+    await chrome.debugger.attach(target, "1.3");
+    const { nodes } = await chrome.debugger.sendCommand(target, "Accessibility.getFullAXTree", {});
+
+    // Convert AX tree to a compact representation
+    const compact = [];
+    for (const node of nodes) {
+      const role = node.role?.value || "";
+      const name = node.name?.value || "";
+      const value = node.value?.value || "";
+
+      // Skip generic/invisible nodes
+      if (role === "none" || role === "generic" || role === "InlineTextBox") continue;
+      if (!name && !value && !node.children?.length) continue;
+
+      const entry = { role };
+      if (name) entry.name = name;
+      if (value) entry.value = value;
+      if (node.properties) {
+        for (const prop of node.properties) {
+          if (prop.name === "focused" && prop.value?.value) entry.focused = true;
+          if (prop.name === "checked") entry.checked = prop.value?.value;
+          if (prop.name === "disabled" && prop.value?.value) entry.disabled = true;
+          if (prop.name === "expanded") entry.expanded = prop.value?.value;
+        }
+      }
+      compact.push(entry);
+    }
+
+    await chrome.debugger.detach(target);
+
+    const tab = await chrome.tabs.get(tabId);
+    return { title: tab.title, url: tab.url, nodes: compact };
+  } catch (err) {
+    try { await chrome.debugger.detach(target); } catch {}
+    throw new Error(`Accessibility tree failed: ${err.message}`);
+  }
 }
 
 async function pageClick({ tabId, selector, x, y }) {
@@ -222,16 +329,13 @@ async function pageType({ tabId, text, selector }) {
       }
       if (!el) return { error: "No element to type into" };
 
-      // Focus the element
       el.focus();
 
-      // For input/textarea, set value and dispatch events
       if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
         el.value = txt;
         el.dispatchEvent(new Event("input", { bubbles: true }));
         el.dispatchEvent(new Event("change", { bubbles: true }));
       } else {
-        // For contenteditable
         el.textContent = txt;
         el.dispatchEvent(new Event("input", { bubbles: true }));
       }
@@ -245,7 +349,6 @@ async function pageType({ tabId, text, selector }) {
 
 async function pageScreenshot({ tabId }) {
   if (!tabId) throw new Error("tabId required");
-  // Ensure tab is active for capture
   const tab = await chrome.tabs.get(tabId);
   await chrome.tabs.update(tabId, { active: true });
   await chrome.windows.update(tab.windowId, { focused: true });
@@ -254,9 +357,31 @@ async function pageScreenshot({ tabId }) {
   const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
     format: "png",
   });
-  // Return base64 without the data:image/png;base64, prefix
   const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
   return { image: base64, format: "png" };
+}
+
+// page_eval: Uses chrome.debugger Runtime.evaluate to bypass CSP
+async function pageEval({ tabId, code }) {
+  if (!tabId || !code) throw new Error("tabId and code required");
+  const target = { tabId };
+  try {
+    await chrome.debugger.attach(target, "1.3");
+    const result = await chrome.debugger.sendCommand(target, "Runtime.evaluate", {
+      expression: code,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    await chrome.debugger.detach(target);
+
+    if (result.exceptionDetails) {
+      throw new Error(result.exceptionDetails.text || result.exceptionDetails.exception?.description || "Evaluation failed");
+    }
+    return result.result?.value ?? null;
+  } catch (err) {
+    try { await chrome.debugger.detach(target); } catch {}
+    throw err;
+  }
 }
 
 // --- Helpers ---
@@ -270,7 +395,6 @@ function waitForTabLoad(tabId) {
       }
     };
     chrome.tabs.onUpdated.addListener(listener);
-    // Timeout after 30s
     setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(listener);
       resolve();
@@ -281,6 +405,18 @@ function waitForTabLoad(tabId) {
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
+
+// Keep service worker alive with alarms (fires every 25s)
+chrome.alarms.create("keep-alive", { periodInMinutes: 25 / 60 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "keep-alive") {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ id: "ping", method: "ping" }));
+    } else {
+      connect();
+    }
+  }
+});
 
 // Connect on startup
 connect();

@@ -7,66 +7,14 @@ Chrome extension + local MCP server for browser automation. No remote bridges, n
 ```
 Claude Code CLI
     ↕ stdio (MCP protocol)
-MCP Server (Node.js)
-    ↕ HTTP (localhost:7331)
-Chrome Extension (Manifest V3, background service worker)
-    ↕ Chrome Extensions API
-Web pages
-```
-
-## Components
-
-### 1. Chrome Extension
-
-Manifest V3 extension. Background service worker runs an HTTP server on `localhost:7331` using `chrome.offscreen` or direct fetch handling.
-
-Actually — Chrome extensions can't run HTTP servers directly. The extension instead:
-- Listens for messages via `chrome.runtime.onMessageExternal`
-- A **native messaging host** bridges HTTP to the extension
-
-Revised architecture:
-
-```
-Claude Code CLI
-    ↕ stdio (MCP protocol)
-MCP Server (Node.js)
-    ↕ HTTP (localhost:7331)
-Bridge Server (Node.js, same process as MCP server)
-    ↕ Native Messaging (stdio)
-Chrome Extension (Manifest V3)
-    ↕ Chrome Extensions API
-Web pages
-```
-
-Simpler alternative: skip native messaging entirely. The MCP server connects to Chrome via **Chrome DevTools Protocol (CDP)** on the debugging port. The extension is only needed for tab-level permissions. Or even simpler:
-
-**Simplest viable architecture:**
-
-```
-Claude Code CLI
-    ↕ stdio (MCP protocol)
-MCP Server (Node.js)
-    ↕ WebSocket (localhost:7331)
-Chrome Extension (Manifest V3, service worker)
+MCP Server + WebSocket Server (Node.js, localhost:7331)
+    ↕ WebSocket
+Chrome Extension (connects as WS client to localhost:7331)
     ↕ Chrome Extensions API + chrome.debugger
 Web pages
 ```
 
-Extension opens a WebSocket server? No — service workers can't do that.
-
-**Final architecture (proven pattern):**
-
-```
-Claude Code CLI
-    ↕ stdio (MCP protocol)
-MCP Server + WebSocket Server (Node.js, localhost:7331)
-    ↕ WebSocket
-Chrome Extension (connects as WS client to localhost:7331)
-    ↕ Chrome Extensions API
-Web pages
-```
-
-The Node.js process runs both the MCP server (stdio) and a WebSocket server. The Chrome extension connects to the WS server as a client on load. Commands flow: Claude → MCP stdio → Node.js → WS → extension → Chrome API → result back.
+The Node.js process runs both the MCP server (stdio) and a WebSocket server. The Chrome extension connects to the WS server as a client on load. Commands flow: Claude -> MCP stdio -> Node.js -> WS -> extension -> Chrome API -> result back.
 
 ## API
 
@@ -79,48 +27,75 @@ The Node.js process runs both the MCP server (stdio) and a WebSocket server. The
 | `tab_navigate` | `tabId`, `url` | Navigate tab to URL |
 | `tab_close` | `tabId` | Close a tab |
 | `tab_switch` | `tabId` | Focus/activate a tab |
-| `page_read` | `tabId` | Get accessibility tree / DOM snapshot |
+| `page_read` | `tabId`, `selector?`, `mode?` | Read page content (modes: text, interactive, accessibility) |
 | `page_click` | `tabId`, `selector` or `x,y` | Click element |
-| `page_type` | `tabId`, `text` | Type text |
+| `page_type` | `tabId`, `text`, `selector?` | Type text into element |
 | `page_screenshot` | `tabId` | Capture screenshot (base64 PNG) |
+| `page_eval` | `tabId`, `code` | Execute JS via Chrome DevTools Protocol (bypasses CSP) |
+
+### page_read modes
+
+- **text** (default) — Flattened readable content. Skips scripts/styles/svg/invisible elements. Collapses wrapper divs/spans with no semantic meaning. Depth limit: 30.
+- **interactive** — Only returns interactive elements: buttons, links, inputs, textareas, selects. Useful for discovering what actions are available.
+- **accessibility** — Uses `chrome.debugger` to read Chrome's full accessibility tree. Cleanest view for SPAs like Discord, Gmail. Returns flat list of `{ role, name, value, focused?, checked?, disabled?, expanded? }`.
 
 ### WebSocket Protocol (between Node server and extension)
 
 ```json
-// Request (server → extension)
+// Request (server -> extension)
 {"id": "uuid", "method": "tabs_list", "params": {}}
 
-// Response (extension → server)  
+// Response (extension -> server)
 {"id": "uuid", "result": [...]}
 
 // Error
 {"id": "uuid", "error": "message"}
+
+// Keep-alive ping (extension -> server, every 25s)
+{"id": "ping", "method": "ping"}
 ```
+
+## Key Implementation Details
+
+### Service Worker Keep-Alive
+Chrome kills inactive service workers after ~30s. The extension uses `chrome.alarms` (every 25s) to send WebSocket pings and prevent sleep.
+
+### CSP Bypass
+Many sites (Gmail, Discord) block inline script injection via Content Security Policy. The `page_eval` tool uses `chrome.debugger` with `Runtime.evaluate` which bypasses CSP entirely (equivalent to running code in the DevTools console).
+
+### SPA Compatibility
+Heavy SPAs require specific handling:
+- Gmail: Closure Library needs full MouseEvent sequences (mousedown, mouseup, click)
+- Discord: Hashed class names require partial `[class*="..."]` selectors
+- See `docs/skills.md` for app-specific patterns
 
 ## File Structure
 
 ```
 chrome-mcp/
+├── docs/
+│   ├── design.md          # This file — architecture and API
+│   └── skills.md          # App-specific automation patterns
 ├── extension/
-│   ├── manifest.json
-│   ├── background.js      # Service worker, WS client, Chrome API calls
+│   ├── manifest.json      # Manifest V3, permissions: tabs, scripting, debugger, alarms
+│   ├── background.js      # Service worker, WS client, Chrome API calls, debugger
 │   └── content.js         # Injected into pages for DOM access
 ├── server/
-│   ├── index.js            # MCP server (stdio) + WebSocket server
+│   ├── index.js           # MCP server (stdio) + WebSocket server
+│   ├── bridge.js          # WebSocket bridge to Chrome extension
+│   ├── tools.js           # Tool definitions with Zod schemas
 │   └── package.json
-├── mcp-config.json         # Example config for claude --mcp-config
+├── mcp-config.json        # Example config for claude --mcp-config
 └── README.md
 ```
 
 ## Usage
 
 ```bash
-# 1. Install extension in Chrome (load unpacked)
-# 2. Start MCP server
-node server/index.js
-
+# 1. Install extension in Chrome (load unpacked -> extension/)
+# 2. Add to Claude Code MCP config (see mcp-config.json)
 # 3. Use with Claude Code
-claude --mcp-config mcp-config.json -p "go to discord and check messages"
+claude -p "go to discord and check messages"
 ```
 
 ## MCP Config

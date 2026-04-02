@@ -23,6 +23,6 @@ for (const [name, tool] of Object.entries(TOOLS)) {
   });
 }
 
-bridge.start();
+await bridge.start();
 const transport = new StdioServerTransport();
 await server.connect(transport);

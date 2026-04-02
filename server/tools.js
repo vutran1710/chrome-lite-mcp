@@ -31,9 +31,15 @@ export const TOOLS = {
     },
   },
   page_read: {
-    description: "Read page content as a simplified DOM tree with text, roles, and attributes",
+    description:
+      "Read page content. Modes: 'text' (default, readable text with flattened wrappers), 'interactive' (buttons/links/inputs only), 'accessibility' (Chrome accessibility tree via debugger). Optional CSS selector to scope.",
     schema: {
       tabId: z.number().describe("Tab ID"),
+      selector: z.string().optional().describe("CSS selector to scope reading to a subtree"),
+      mode: z
+        .enum(["text", "interactive", "accessibility"])
+        .optional()
+        .describe("Read mode: text (default), interactive, or accessibility"),
     },
   },
   page_click: {
@@ -57,6 +63,14 @@ export const TOOLS = {
     description: "Capture a screenshot of the visible tab area",
     schema: {
       tabId: z.number().describe("Tab ID"),
+    },
+  },
+  page_eval: {
+    description:
+      "Execute JavaScript in the page context via Chrome DevTools Protocol (bypasses CSP). Returns the evaluated result.",
+    schema: {
+      tabId: z.number().describe("Tab ID"),
+      code: z.string().describe("JavaScript expression to evaluate"),
     },
   },
 };
