@@ -68,6 +68,14 @@ export class ChromeBridge {
     });
   }
 
+  /**
+   * Push a notification to the extension (no response expected).
+   */
+  notify(method, params = {}) {
+    if (!this.connected) return;
+    this.client.send(JSON.stringify({ id: "notify", method, params }));
+  }
+
   _log(msg) {
     process.stderr.write(`[chrome-lite-mcp] ${msg}\n`);
   }
@@ -78,6 +86,12 @@ export class ChromeBridge {
 
     // Ignore keep-alive pings from extension
     if (msg.id === "ping" && msg.method === "ping") return;
+
+    // Handle plugin confirm from extension popup
+    if (msg.method === "plugin_confirm") {
+      if (this.onPluginConfirm) this.onPluginConfirm(msg.params?.plugin);
+      return;
+    }
 
     const req = this.pending.get(msg.id);
     if (!req) return;

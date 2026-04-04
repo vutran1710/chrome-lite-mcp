@@ -1,13 +1,27 @@
 import { ensureTab, evaluate, realClick, sleep } from "./helpers.js";
 
-const URL = "https://mail.google.com/mail/u/0/#inbox";
-
 export default {
   name: "gmail",
+  url: "https://mail.google.com",
+
+  async init(bridge) {
+    const tabId = await ensureTab(bridge, "https://mail.google.com");
+    await sleep(3000);
+    const result = await evaluate(bridge, tabId, `
+      (() => {
+        if (document.title.includes('Inbox') || document.title.includes('Gmail')) {
+          return { loggedIn: true };
+        }
+        return { loggedIn: false, message: "Please log in to Gmail" };
+      })()
+    `);
+    return result;
+  },
+
   tools: {
     list_emails: {
       description: "List inbox emails with sender, subject, snippet, and unread status",
-      async handler(bridge, params) {
+      async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
         await sleep(1000);
         return evaluate(bridge, tabId, `
@@ -53,7 +67,7 @@ export default {
 
     select_all: {
       description: "Select all visible emails",
-      async handler(bridge, params) {
+      async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
         return realClick(bridge, tabId, `
           const selectAll = document.querySelector('span[role="checkbox"]');
@@ -67,7 +81,7 @@ export default {
 
     mark_read: {
       description: "Mark selected emails as read",
-      async handler(bridge, params) {
+      async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
         return realClick(bridge, tabId, `
           const allBtns = document.querySelectorAll('[role="button"]');
@@ -84,7 +98,7 @@ export default {
 
     delete_selected: {
       description: "Delete selected emails",
-      async handler(bridge, params) {
+      async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
         return realClick(bridge, tabId, `
           const allBtns = document.querySelectorAll('[role="button"]');
@@ -101,7 +115,7 @@ export default {
 
     archive_selected: {
       description: "Archive selected emails",
-      async handler(bridge, params) {
+      async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
         return realClick(bridge, tabId, `
           const allBtns = document.querySelectorAll('[role="button"]');

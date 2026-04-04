@@ -2,6 +2,20 @@ import { ensureTab, evaluate, realClick, sleep } from "./helpers.js";
 
 export default {
   name: "zalo",
+  url: "https://chat.zalo.me",
+
+  async init(bridge) {
+    const tabId = await ensureTab(bridge, "https://chat.zalo.me");
+    await sleep(3000);
+    return evaluate(bridge, tabId, `
+      (() => {
+        if (document.title.includes('Zalo') && !document.title.includes('Đăng nhập')) {
+          return { loggedIn: true };
+        }
+        return { loggedIn: false, message: "Please scan QR code to log in to Zalo" };
+      })()
+    `);
+  },
   tools: {
     list_chats: {
       description: "List Zalo conversations with last message preview",

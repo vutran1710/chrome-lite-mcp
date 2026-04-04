@@ -1,9 +1,19 @@
 import { ensureTab, evaluate, navigate, click, sleep } from "./helpers.js";
 
-const BASE_URL = "https://discord.com/channels/@me";
-
 export default {
   name: "discord",
+  url: "https://discord.com/channels/@me",
+
+  async init(bridge) {
+    const tabId = await ensureTab(bridge, "https://discord.com/channels/@me");
+    await sleep(3000);
+    return evaluate(bridge, tabId, `
+      (() => {
+        if (document.querySelector('[class*="guilds_"]')) return { loggedIn: true };
+        return { loggedIn: false, message: "Please log in to Discord" };
+      })()
+    `);
+  },
   tools: {
     list_dms: {
       description: "List Discord DMs with online status and last message preview",

@@ -2,6 +2,20 @@ import { ensureTab, evaluate, navigate, sleep } from "./helpers.js";
 
 export default {
   name: "messenger",
+  url: "https://www.messenger.com",
+
+  async init(bridge) {
+    const tabId = await ensureTab(bridge, "https://www.messenger.com");
+    await sleep(3000);
+    return evaluate(bridge, tabId, `
+      (() => {
+        if (document.title.includes('Messenger') && !document.querySelector('[name="email"]')) {
+          return { loggedIn: true };
+        }
+        return { loggedIn: false, message: "Please log in to Messenger" };
+      })()
+    `);
+  },
   tools: {
     list_chats: {
       description: "List Messenger conversations with last message preview",

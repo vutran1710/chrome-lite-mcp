@@ -26,6 +26,12 @@ function connect() {
       return;
     }
 
+    // Handle plugin status notifications (no response needed)
+    if (msg.method === "plugin_status") {
+      updatePluginState(msg.params);
+      return;
+    }
+
     try {
       const result = await handleCommand(msg.method, msg.params || {});
       ws.send(JSON.stringify({ id: msg.id, result }));
@@ -415,6 +421,31 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     } else {
       connect();
     }
+  }
+});
+
+// --- Plugin state management ---
+
+function updatePluginState(params) {
+  chrome.storage.local.get("pluginStates", (data) => {
+    const states = data.pluginStates || {};
+    states[params.plugin] = {
+      state: params.state,
+      message: params.message || null,
+      tabId: params.tabId || null,
+    };
+    chrome.storage.local.set({ pluginStates: states });
+  });
+}
+
+// Handle messages from popup (e.g., confirm login)
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === "plugin_confirm" && ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      id: "confirm",
+      method: "plugin_confirm",
+      params: { plugin: msg.plugin },
+    }));
   }
 });
 

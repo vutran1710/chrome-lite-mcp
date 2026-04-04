@@ -8,8 +8,12 @@ import { z } from "zod";
  * @param {Function} [onJobResult] - Optional callback(result, jobInfo) for background job results
  */
 export function registerPluginTools(server, loader, scheduler, bridge, onJobResult) {
-  server.tool("plugins", "List all installed plugins", {}, async () => {
-    return ok(loader.listPlugins());
+  server.tool("plugins", "List activated (ready) plugins", {}, async () => {
+    return ok(loader.listActivatedPlugins());
+  });
+
+  server.tool("all_plugins", "List all available plugins with their state", {}, async () => {
+    return ok(loader.getAllStates());
   });
 
   server.tool(
@@ -18,6 +22,16 @@ export function registerPluginTools(server, loader, scheduler, bridge, onJobResu
     { plugin: z.string().describe("Plugin name") },
     async ({ plugin }) => {
       return ok(loader.listTools(plugin));
+    }
+  );
+
+  server.tool(
+    "init_plugin",
+    "Initialize a plugin: open tab, check login, return status",
+    { plugin: z.string().describe("Plugin name") },
+    async ({ plugin }) => {
+      const result = await loader.initPlugin(plugin, bridge);
+      return ok(result);
     }
   );
 

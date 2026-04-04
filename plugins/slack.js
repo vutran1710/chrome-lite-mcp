@@ -1,7 +1,21 @@
-import { ensureTab, evaluate, click, sleep } from "./helpers.js";
+import { ensureTab, evaluate, sleep } from "./helpers.js";
 
 export default {
   name: "slack",
+  url: "https://app.slack.com",
+
+  async init(bridge) {
+    const tabId = await ensureTab(bridge, "https://app.slack.com");
+    await sleep(3000);
+    return evaluate(bridge, tabId, `
+      (() => {
+        if (document.querySelector('[data-qa="channel_sidebar"]')) {
+          return { loggedIn: true };
+        }
+        return { loggedIn: false, message: "Please log in to Slack" };
+      })()
+    `);
+  },
   tools: {
     list_channels: {
       description: "List Slack channels and DMs with unread status",

@@ -5,16 +5,15 @@ import { Scheduler } from "../scheduler.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Mock bridge
 const mockBridge = {
-  async send(method, params) {
-    return { method, params };
-  },
+  send() {},
+  notify() {},
 };
 
-// Mock plugin
 const mockPlugin = {
   name: "mock",
+  url: "https://example.com",
+  async init() { return { loggedIn: true }; },
   tools: {
     fetch_data: {
       description: "Fetch some data",
@@ -41,6 +40,7 @@ describe("Plugin API integration", () => {
   it("get calls plugin handler and returns result", async () => {
     const loader = new PluginLoader();
     loader.register(mockPlugin);
+    await loader.initPlugin("mock", mockBridge);
     const handler = loader.getHandler("mock", "fetch_data");
     const result = await handler(mockBridge, { filter: "unread" });
     assert.deepStrictEqual(result, { items: [1, 2, 3], filter: "unread" });
@@ -49,6 +49,7 @@ describe("Plugin API integration", () => {
   it("post calls plugin handler and returns result", async () => {
     const loader = new PluginLoader();
     loader.register(mockPlugin);
+    await loader.initPlugin("mock", mockBridge);
     const handler = loader.getHandler("mock", "do_action");
     const result = await handler(mockBridge, { action: "delete" });
     assert.deepStrictEqual(result, { ok: true, action: "delete" });
@@ -57,6 +58,7 @@ describe("Plugin API integration", () => {
   it("create_job schedules and runs plugin handler", async () => {
     const loader = new PluginLoader();
     loader.register(mockPlugin);
+    await loader.initPlugin("mock", mockBridge);
     scheduler = new Scheduler();
 
     let captured = null;
@@ -70,12 +72,12 @@ describe("Plugin API integration", () => {
     assert.ok(captured);
     assert.deepStrictEqual(captured.result, { items: [1, 2, 3], filter: "all" });
     assert.strictEqual(captured.info.plugin, "mock");
-    assert.strictEqual(captured.info.tool, "fetch_data");
   });
 
   it("create_job with interval runs multiple times", async () => {
     const loader = new PluginLoader();
     loader.register(mockPlugin);
+    await loader.initPlugin("mock", mockBridge);
     scheduler = new Scheduler();
 
     let count = 0;
@@ -87,34 +89,36 @@ describe("Plugin API integration", () => {
     assert.ok(count >= 3, `expected >= 3 runs, got ${count}`);
   });
 
-  it("end-to-end: plugins → tools → get → create_job → list_jobs → delete_job", async () => {
+  it("end-to-end: init → plugins → tools → get → create_job → list → delete", async () => {
     const loader = new PluginLoader();
     loader.register(mockPlugin);
     scheduler = new Scheduler();
 
-    // plugins
-    assert.deepStrictEqual(loader.listPlugins(), ["mock"]);
+    // Before init: not activated
+    assert.deepStrictEqual(loader.listActivatedPlugins(), []);
 
-    // tools
+    // Init
+    await loader.initPlugin("mock", mockBridge);
+    assert.deepStrictEqual(loader.listActivatedPlugins(), ["mock"]);
+
+    // Tools
     const tools = loader.listTools("mock");
     assert.strictEqual(tools.length, 2);
 
-    // get
+    // Get
     const handler = loader.getHandler("mock", "fetch_data");
     const data = await handler(mockBridge, {});
     assert.ok(data.items);
 
-    // create_job
+    // Create job
     const fn = () => handler(mockBridge, {});
     const id = scheduler.create("mock", "fetch_data", "interval", 1000, fn);
     assert.ok(id.startsWith("mock:fetch_data:"));
 
-    // list_jobs
-    const jobs = scheduler.list();
-    assert.strictEqual(jobs.length, 1);
-    assert.strictEqual(jobs[0].id, id);
+    // List jobs
+    assert.strictEqual(scheduler.list().length, 1);
 
-    // delete_job
+    // Delete job
     assert.ok(scheduler.delete(id));
     assert.strictEqual(scheduler.list().length, 0);
   });

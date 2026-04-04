@@ -45,6 +45,16 @@ const onJobResult = (result, info) => {
 
 registerPluginTools(server, loader, scheduler, bridge, onJobResult);
 
+// Handle login confirmations from extension popup
+bridge.onPluginConfirm = async (pluginName) => {
+  try {
+    const result = await loader.confirmLogin(pluginName, bridge);
+    process.stderr.write(`[plugin] ${pluginName} confirm: ${JSON.stringify(result)}\n`);
+  } catch (err) {
+    process.stderr.write(`[plugin] ${pluginName} confirm error: ${err.message}\n`);
+  }
+};
+
 // Start
 await bridge.start();
 const transport = new StdioServerTransport();
