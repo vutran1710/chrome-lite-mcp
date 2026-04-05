@@ -53,6 +53,54 @@ export default {
       },
     },
 
+    read_email: {
+      description: "Read full content of an email by index. Params: { index: number }",
+      async handler(bridge, params) {
+        const tabId = await ensureTab(bridge, "https://mail.google.com");
+        const idx = params.index || 0;
+
+        // Click the email row to open it
+        await evaluate(bridge, tabId, `
+          (() => {
+            const rows = document.querySelectorAll('tr.zA');
+            const row = rows[${idx}];
+            if (!row) return false;
+            const subject = row.querySelector('.bog span, .bqe');
+            if (subject) subject.click();
+            else row.click();
+            return true;
+          })()
+        `);
+        await sleep(2000);
+
+        // Read the email content
+        const email = await evaluate(bridge, tabId, `
+          (() => {
+            const body = document.querySelector('.a3s.aiL, .ii.gt');
+            const content = body?.innerText?.trim() || '';
+            return {
+              subject: document.querySelector('h2.hP')?.textContent?.trim() || '',
+              sender: document.querySelector('.gD')?.getAttribute('name') || '',
+              email: document.querySelector('.gD')?.getAttribute('email') || '',
+              date: document.querySelector('.g3')?.textContent?.trim() || '',
+              content: content.slice(0, 3000),
+            };
+          })()
+        `);
+
+        // Go back to inbox
+        await evaluate(bridge, tabId, `
+          (() => {
+            const back = document.querySelector('[aria-label="Go back"], [aria-label="Back to Inbox"]');
+            if (back) back.click();
+            else location.hash = '#inbox';
+          })()
+        `);
+
+        return { type: "json", data: email, metadata: {} };
+      },
+    },
+
     select_by_sender: {
       description: "Select emails by sender names. Params: { senders: string[] }",
       async handler(bridge, params) {
