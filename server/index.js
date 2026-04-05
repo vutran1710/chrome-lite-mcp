@@ -38,12 +38,7 @@ await loader.loadDir(PLUGINS_DIR);
 
 const scheduler = new Scheduler();
 
-// Optional: job result callback — logs by default, wire to anything
-const onJobResult = (result, info) => {
-  process.stderr.write(`[job] ${info.id}: ${JSON.stringify(result).slice(0, 200)}\n`);
-};
-
-registerPluginTools(server, loader, scheduler, bridge, onJobResult);
+registerPluginTools(server, loader, scheduler, bridge);
 
 // Handle login confirmations from extension popup
 bridge.onPluginConfirm = async (pluginName) => {

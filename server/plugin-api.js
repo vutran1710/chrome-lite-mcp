@@ -10,7 +10,7 @@ import { z } from "zod";
 /**
  * @param {Function} [onJobResult] - Optional callback(result, jobInfo) for background job results
  */
-export function registerPluginTools(server, loader, scheduler, bridge, onJobResult) {
+export function registerPluginTools(server, loader, scheduler, bridge) {
   server.tool("plugins", "List activated (ready) plugins", {}, async () => {
     return respond(loader.listActivatedPlugins());
   });
@@ -87,12 +87,27 @@ export function registerPluginTools(server, loader, scheduler, bridge, onJobResu
       type: z.enum(["interval", "timeout"]).describe("Job type"),
       ms: z.number().describe("Interval or delay in milliseconds"),
       params: z.string().optional().describe("Tool parameters as JSON string"),
+      webhook: z.string().optional().describe("URL to POST results to"),
+      webhookHeaders: z.string().optional().describe("Headers as JSON string, e.g. {\"X-API-Key\": \"...\"}"),
     },
-    async ({ plugin, tool, type, ms, params }) => {
+    async ({ plugin, tool, type, ms, params, webhook, webhookHeaders }) => {
       const handler = loader.getHandler(plugin, tool);
       const parsed = params ? JSON.parse(params) : {};
       const fn = () => handler(bridge, parsed);
-      const id = scheduler.create(plugin, tool, type, ms, fn, onJobResult);
+
+      let callback;
+      if (webhook) {
+        const headers = webhookHeaders ? JSON.parse(webhookHeaders) : {};
+        callback = (result, info) => {
+          fetch(webhook, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...headers },
+            body: JSON.stringify({ source: info.plugin, tool: info.tool, data: result, timestamp: info.timestamp }),
+          }).catch(() => {});
+        };
+      }
+
+      const id = scheduler.create(plugin, tool, type, ms, fn, callback);
       return respond({ id });
     }
   );
